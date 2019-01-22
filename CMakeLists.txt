@@ -33,7 +33,7 @@ file (WRITE Makefile "# auto-generated makefile
 all: cmake build run
 
 cmake:
-\tcmake -G\"Visual Studio 14 2015 Win64\" -H. -B\"${CMAKE_BINARY_DIR}\" || echo \">>>> cmake initialization failed! <<<<<\"
+\tcmake -G\"Visual Studio 14 2015 Win64\" -S. -B\"${CMAKE_BINARY_DIR}\" || echo \">>>> cmake initialization failed! <<<<<\"
 
 build:
 \tcmake --build \"${CMAKE_BINARY_DIR}\" || echo \">>>> build failed! <<<<<\"
