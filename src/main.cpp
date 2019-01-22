@@ -3,30 +3,20 @@
  *  embeds 24bit-depth-color bitmaps into MASM inc file as 8bit-depth-color bmp
  **/
 #include <string>
-#include <cstdlib>
-#include <cstdio>
-#include <limits.h>
-#include <cstring>
-#include <cstdbool>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <windows.h>
-#include <direct.h>
+#include <vector>
 #include "dirent.h"
 #include "qdbmp.hpp"
 
-#define getcwd _getcwd
-#define open _open
-#define close _close
+using namespace std;
 
 // each pixel is 8 bit (256 colors)
-unsigned char* getImagePixels(const char* path, int* width, int* height) {
-	BMP* bmp = BMP_ReadFile(path);
-    if (!bmp || BMP_GetDepth(bmp) != 24) return NULL;
+unsigned char* getImagePixels(string path, int* width, int* height) {
+	BMP* bmp = BMP_ReadFile(path.c_str());
+    if (!bmp || BMP_GetDepth(bmp) != 24) return nullptr;
 
 	*width = BMP_GetWidth(bmp);
 	*height = BMP_GetHeight(bmp);
-    unsigned char* buffer = (unsigned char*) malloc((*width)*(*height));
+	unsigned char* buffer = new unsigned char[(*width)*(*height)];
 
     unsigned char r, g, b;
     for (int x = 0; x < *width; x++) {
@@ -41,20 +31,15 @@ unsigned char* getImagePixels(const char* path, int* width, int* height) {
     return buffer;
 }
 
-bool isBmp(char* path, int len) {
-    return path && len>0 && strcmp(path+len-4, ".bmp") == 0;
-}
+void writeInc(string path, unsigned char* bytes, int w, int h) {
+    if (!bytes) return;
 
-void writeInc(const char* path, int len, unsigned char* bytes, int w, int h) {
-    if (!path || !bytes) return;
-
-    std::string path2(path);
+    string path2(path);
     path2 += ".inc";
 
-    printf(path2.c_str());
     FILE* f = fopen(path2.c_str(), "w");
 
-    fprintf(f, "%s_WIDTH equ %i\n%s_HEIGHT equ %i\n%s db ", path, w, path, h, path);
+    fprintf(f, "%s_WIDTH equ %i\n%s_HEIGHT equ %i\n%s db ", path.c_str(), w, path.c_str(), h, path.c_str());
     for (long i = 0; i < w*h; i++) {
         fprintf(f, "%hhi,", bytes[i]);
     }
@@ -63,25 +48,38 @@ void writeInc(const char* path, int len, unsigned char* bytes, int w, int h) {
     fclose(f);
 }
 
-int main(int argc, char const *argv[]) {
-    char cwd[PATH_MAX];
-    getcwd(cwd, sizeof(cwd));
+bool isBmp(string path) {
+    return path.find(".bmp") != string::npos;
+}
 
-    DIR* dir;
-    struct dirent* ent;
-    dir = opendir(cwd);
-    while ((ent = readdir(dir)) != NULL) {
-        if (isBmp(ent->d_name, ent->d_namlen)) {
-            int w,h;
-            unsigned char* bytes = getImagePixels(ent->d_name, &w, &h);
-            if (bytes) {
-                writeInc(ent->d_name, ent->d_namlen, bytes, w, h);
-                printf(ent->d_name);
-                free(bytes);
-            }
-        }
-    }
+string getCurrentDir() {
+    char buffer[MAX_PATH];
+    GetModuleFileName( NULL, buffer, MAX_PATH );
+    string::size_type pos = string( buffer ).find_last_of( "\\/" );
+    return string( buffer ).substr( 0, pos);
+}
 
-    closedir (dir);
-    return 0;
+vector<string> getPathToDirFiles(string directory) {
+	DIR* dir;
+	struct dirent* ent;
+	dir = opendir(directory.c_str());
+	vector<string> files;
+	while ((ent = readdir(dir)) != NULL) {
+		files.push_back(string(ent->d_name));
+	}
+	closedir(dir);
+	return files;
+}
+
+int main() {
+	for (auto filePath : getPathToDirFiles(getCurrentDir())) {
+		if (isBmp(filePath)) {
+			int w, h;
+			unsigned char* pixels = getImagePixels(filePath, &w, &h);
+			if (pixels) {
+				writeInc(filePath, pixels, w, h);
+				delete pixels;
+			}
+		}
+	}
 }
